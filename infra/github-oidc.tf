@@ -38,3 +38,20 @@ resource "azurerm_role_assignment" "github_tfstate_blob_contributor" {
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azuread_service_principal.github.object_id
 }
+
+resource "azurerm_role_assignment" "github_tfstate_reader" {
+  scope                = data.azurerm_storage_account.tfstate.id
+  role_definition_name = "Reader"
+  principal_id         = azuread_service_principal.github.object_id
+}
+
+data "azuread_service_principal" "msgraph" {
+  client_id = "00000003-0000-0000-c000-000000000000"
+}
+
+# CI plan의 azuread 리소스 refresh용 읽기 권한 — azuread 변경 apply는 로컬 수행
+resource "azuread_app_role_assignment" "github_graph_app_read" {
+  app_role_id         = data.azuread_service_principal.msgraph.app_role_ids["Application.Read.All"]
+  principal_object_id = azuread_service_principal.github.object_id
+  resource_object_id  = data.azuread_service_principal.msgraph.object_id
+}
