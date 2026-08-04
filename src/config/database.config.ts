@@ -12,5 +12,6 @@ export function databaseConfig(config: ConfigService): TypeOrmModuleOptions {
     timezone: 'Z',
     autoLoadEntities: true,
     synchronize: config.get<boolean>('DB_SYNCHRONIZE', false),
+    ssl: config.get<boolean>('DB_SSL', false) ? {} : undefined,
   };
 }

@@ -32,12 +32,22 @@ class EnvironmentVariables {
   @IsBoolean()
   DB_SYNCHRONIZE?: boolean;
 
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  DB_SSL?: boolean;
+
   @IsString()
   @IsNotEmpty()
   REDIS_HOST: string;
 
   @IsInt()
   REDIS_PORT: number;
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  REDIS_TLS?: boolean;
 
   @IsOptional()
   @IsInt()
