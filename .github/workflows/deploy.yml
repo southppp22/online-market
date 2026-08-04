@@ -1,0 +1,113 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "scripts/**"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+      - "tsconfig.build.json"
+      - "nest-cli.json"
+      - ".github/workflows/deploy.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  RESOURCE_GROUP: rg-online-market-prod
+  APP_NAME: online-market-api
+  JOB_NAME: online-market-migration
+  ACR_NAME: cronlinemarketprod
+  IMAGE: cronlinemarketprod.azurecr.io/online-market-api
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx eslint "{src,apps,libs,test,scripts}/**/*.ts"
+      - run: npm test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: 이미지 빌드·ACR 푸시
+        run: |
+          az acr login --name "$ACR_NAME"
+          docker build -t "$IMAGE:${{ github.sha }}" .
+          docker push "$IMAGE:${{ github.sha }}"
+
+      - name: 현재 배포 이미지 태그 보관 (롤백용)
+        id: current
+        run: |
+          CURRENT=$(az containerapp show -n "$APP_NAME" -g "$RESOURCE_GROUP" \
+            --query "properties.template.containers[0].image" -o tsv)
+          echo "롤백 대상 이미지: $CURRENT"
+          echo "image=$CURRENT" >> "$GITHUB_OUTPUT"
+
+      - name: 마이그레이션 Job 실행 (실패 시 여기서 중단 — 앱은 구버전 유지)
+        run: |
+          az containerapp job update -n "$JOB_NAME" -g "$RESOURCE_GROUP" \
+            --image "$IMAGE:${{ github.sha }}" -o none
+          EXECUTION=$(az containerapp job start -n "$JOB_NAME" -g "$RESOURCE_GROUP" \
+            --query name -o tsv)
+          echo "execution: $EXECUTION"
+          for i in $(seq 1 60); do
+            STATUS=$(az containerapp job execution show -n "$JOB_NAME" -g "$RESOURCE_GROUP" \
+              --job-execution-name "$EXECUTION" --query properties.status -o tsv)
+            echo "[$i] $STATUS"
+            case "$STATUS" in
+              Succeeded) exit 0 ;;
+              Failed|Stopped) exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "마이그레이션 타임아웃(10분)"
+          exit 1
+
+      - name: 앱 이미지 업데이트
+        id: update
+        run: |
+          az containerapp update -n "$APP_NAME" -g "$RESOURCE_GROUP" \
+            --image "$IMAGE:${{ github.sha }}" -o none
+
+      - name: 헬스 확인
+        run: |
+          FQDN=$(az containerapp show -n "$APP_NAME" -g "$RESOURCE_GROUP" \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          for i in $(seq 1 30); do
+            if curl -sf -m 5 "https://$FQDN/api/health" > /dev/null; then
+              echo "healthy: https://$FQDN/api/health"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "헬스 체크 실패(5분)"
+          exit 1
+
+      - name: 롤백 — 보관한 이전 이미지로 재배포
+        if: failure() && steps.update.outcome != 'skipped'
+        run: |
+          echo "롤백: ${{ steps.current.outputs.image }}"
+          az containerapp update -n "$APP_NAME" -g "$RESOURCE_GROUP" \
+            --image "${{ steps.current.outputs.image }}" -o none
