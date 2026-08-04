@@ -7,6 +7,7 @@ import { ClsModule } from 'nestjs-cls';
 import { RedisModule } from './common/redis/redis.module';
 import { databaseConfig } from './config/database.config';
 import { validateEnv } from './config/env.validation';
+import { ProductModule } from './modules/product/product.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { validateEnv } from './config/env.validation';
       ],
     }),
     RedisModule,
+    ProductModule,
   ],
 })
 export class AppModule {}
