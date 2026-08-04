@@ -10,6 +10,8 @@ import { validateEnv } from './config/env.validation';
 import { AuthModule } from './modules/auth/auth.module';
 import { CartModule } from './modules/cart/cart.module';
 import { CouponModule } from './modules/coupon/coupon.module';
+import { OrderModule } from './modules/order/order.module';
+import { PaymentModule } from './modules/payment/payment.module';
 import { ProductModule } from './modules/product/product.module';
 import { UserModule } from './modules/user/user.module';
 
@@ -37,6 +39,8 @@ import { UserModule } from './modules/user/user.module';
     AuthModule,
     CouponModule,
     CartModule,
+    OrderModule,
+    PaymentModule,
   ],
 })
 export class AppModule {}
