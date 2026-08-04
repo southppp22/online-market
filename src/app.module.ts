@@ -8,6 +8,7 @@ import { RedisModule } from './common/redis/redis.module';
 import { databaseConfig } from './config/database.config';
 import { validateEnv } from './config/env.validation';
 import { AuthModule } from './modules/auth/auth.module';
+import { CouponModule } from './modules/coupon/coupon.module';
 import { ProductModule } from './modules/product/product.module';
 import { UserModule } from './modules/user/user.module';
 
@@ -33,6 +34,7 @@ import { UserModule } from './modules/user/user.module';
     ProductModule,
     UserModule,
     AuthModule,
+    CouponModule,
   ],
 })
 export class AppModule {}
