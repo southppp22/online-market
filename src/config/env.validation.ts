@@ -45,6 +45,10 @@ class EnvironmentVariables {
   REDIS_PORT: number;
 
   @IsOptional()
+  @IsString()
+  REDIS_PASSWORD?: string;
+
+  @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   REDIS_TLS?: boolean;
