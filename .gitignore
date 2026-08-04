@@ -35,3 +35,5 @@ npm-debug.log*
 *.tfvars
 *.tfplan
 tfplan
+# terraform 코드는 로컬 전용
+infra/
