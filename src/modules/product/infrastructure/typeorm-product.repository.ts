@@ -69,11 +69,9 @@ export class TypeOrmProductRepository extends ProductRepository {
 
   async findSkusByIdsForUpdate(skuIds: string[]): Promise<Sku[]> {
     if (skuIds.length === 0) return [];
-    // 정렬 없이 잠그면 트랜잭션 간 교착상태가 발생할 수 있어 id 오름차순으로 정렬 후 잠근다.
-    const sortedIds = [...skuIds].sort();
     const skus = await this.txHost.tx
       .createQueryBuilder(Sku, 'sku')
-      .where('sku.id IN (:...sortedIds)', { sortedIds })
+      .where('sku.id IN (:...skuIds)', { skuIds })
       .orderBy('sku.id', 'ASC')
       .setLock('pessimistic_write')
       .getMany();
