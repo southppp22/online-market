@@ -1,9 +1,17 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryColumn,
+} from 'typeorm';
 import { v7 as uuidv7 } from 'uuid';
 import { Product } from './product.entity';
 import { InsufficientStockError, SkuNotFoundError } from './sku.errors';
 
 @Entity('skus')
+@Index(['productId', 'stock'])
 export class Sku {
   @PrimaryColumn('uuid')
   id: string;

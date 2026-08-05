@@ -41,6 +41,7 @@ export class Product {
   @UpdateDateColumn()
   updatedAt: Date;
 
+  @Index()
   @Column({ type: 'datetime', precision: 6, nullable: true })
   deletedAt: Date | null;
 
