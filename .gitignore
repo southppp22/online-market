@@ -37,3 +37,4 @@ npm-debug.log*
 tfplan
 # terraform 코드는 로컬 전용
 infra/
+/load
