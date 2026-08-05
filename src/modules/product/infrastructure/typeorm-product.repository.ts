@@ -118,7 +118,7 @@ export class TypeOrmProductRepository extends ProductRepository {
       .where('product.deletedAt IS NULL');
 
     if (filter.keyword) {
-      qb.andWhere("product.name LIKE :keyword ESCAPE '\\\\'", {
+      qb.andWhere("product.name LIKE :keyword ESCAPE '!'", {
         keyword: `%${this.escapeLikeKeyword(filter.keyword)}%`,
       });
     }
@@ -215,8 +215,7 @@ export class TypeOrmProductRepository extends ProductRepository {
   }
 
   private escapeLikeKeyword(keyword: string): string {
-    // LIKE의 와일드카드(%, _)와 이스케이프 문자(\) 자체를 리터럴로 취급하기 위해 이스케이프한다.
-    return keyword.replace(/[\\%_]/g, '\\$&');
+    return keyword.replace(/[!\\%_]/g, '!$&');
   }
 
   private toListItem(
