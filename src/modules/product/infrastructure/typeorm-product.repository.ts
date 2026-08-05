@@ -5,7 +5,7 @@ import { In, IsNull, SelectQueryBuilder } from 'typeorm';
 import { ProductCategory } from '../domain/product-category';
 import { Product } from '../domain/product.entity';
 import {
-  PRODUCT_LIST_COUNT_CAP,
+  PRODUCT_LIST_MAX_RESULTS,
   ProductListFilter,
   ProductListItem,
   ProductListResult,
@@ -30,10 +30,7 @@ export class TypeOrmProductRepository extends ProductRepository {
   }
 
   async findMany(filter: ProductListFilter): Promise<ProductListResult> {
-    const { totalCount, hasMore } = await this.countCapped(filter);
-    if ((filter.page - 1) * filter.size >= PRODUCT_LIST_COUNT_CAP) {
-      return { items: [], totalCount, hasMore };
-    }
+    const { totalCount, hasMore } = await this.countUpToMax(filter);
     const pageIds = await this.findPageIds(filter);
     const rowById = await this.findListRowsByIds(pageIds);
     const stockByProductId = await this.sumStocksByProductIds(pageIds);
@@ -131,12 +128,12 @@ export class TypeOrmProductRepository extends ProductRepository {
     return qb;
   }
 
-  private async countCapped(
+  private async countUpToMax(
     filter: ProductListFilter,
   ): Promise<{ totalCount: number; hasMore: boolean }> {
     const inner = this.buildFilteredQuery(filter)
       .select('product.id')
-      .limit(PRODUCT_LIST_COUNT_CAP + 1);
+      .limit(PRODUCT_LIST_MAX_RESULTS + 1);
     const [sql, params] = inner.getQueryAndParameters();
     const rows: { cnt: string }[] = await this.txHost.tx.query(
       `SELECT COUNT(1) AS cnt FROM (${sql}) t`,
@@ -144,8 +141,8 @@ export class TypeOrmProductRepository extends ProductRepository {
     );
     const count = Number(rows[0].cnt);
     return {
-      totalCount: Math.min(count, PRODUCT_LIST_COUNT_CAP),
-      hasMore: count > PRODUCT_LIST_COUNT_CAP,
+      totalCount: Math.min(count, PRODUCT_LIST_MAX_RESULTS),
+      hasMore: count > PRODUCT_LIST_MAX_RESULTS,
     };
   }
 
