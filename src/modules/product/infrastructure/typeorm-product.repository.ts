@@ -18,7 +18,6 @@ interface ProductListRow {
   name: string;
   basePrice: string;
   category: ProductCategory;
-  isSoldOut: string;
 }
 
 @Injectable()
@@ -31,8 +30,14 @@ export class TypeOrmProductRepository extends ProductRepository {
 
   async findMany(filter: ProductListFilter): Promise<ProductListResult> {
     const totalCount = await this.buildFilteredQuery(filter).getCount();
-    const rows = await this.buildListQuery(filter).getRawMany<ProductListRow>();
-    return { items: rows.map((row) => this.toListItem(row)), totalCount };
+    const pageIds = await this.findPageIds(filter);
+    const rowById = await this.findListRowsByIds(pageIds);
+    const stockByProductId = await this.sumStocksByProductIds(pageIds);
+    const items = pageIds
+      .map((id) => rowById.get(id))
+      .filter((row): row is ProductListRow => row !== undefined)
+      .map((row) => this.toListItem(row, stockByProductId));
+    return { items, totalCount };
   }
 
   async findByIdWithSkus(id: string): Promise<Product | null> {
@@ -101,36 +106,55 @@ export class TypeOrmProductRepository extends ProductRepository {
     return qb;
   }
 
-  private buildListQuery(
-    filter: ProductListFilter,
-  ): SelectQueryBuilder<Product> {
+  // id만 골라야 오프셋 스킵이 정렬 인덱스만 읽는다 (행 조회는 확정된 size건만).
+  private async findPageIds(filter: ProductListFilter): Promise<string[]> {
     const qb = this.buildFilteredQuery(filter)
-      .leftJoin('product.skus', 'sku')
+      .select('product.id', 'id')
+      .offset((filter.page - 1) * filter.size)
+      .limit(filter.size);
+    this.applySort(qb, filter.sort);
+    const rows = await qb.getRawMany<{ id: string }>();
+    return rows.map((row) => row.id);
+  }
+
+  private async findListRowsByIds(
+    ids: string[],
+  ): Promise<Map<string, ProductListRow>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.txHost.tx
+      .createQueryBuilder(Product, 'product')
       .select('product.id', 'id')
       .addSelect('product.name', 'name')
       .addSelect('product.basePrice', 'basePrice')
       .addSelect('product.category', 'category')
-      .addSelect(
-        'CASE WHEN COALESCE(SUM(sku.stock), 0) = 0 THEN 1 ELSE 0 END',
-        'isSoldOut',
-      )
-      .groupBy('product.id')
-      .offset((filter.page - 1) * filter.size)
-      .limit(filter.size);
-    this.applySort(qb, filter.sort);
-    return qb;
+      .where('product.id IN (:...ids)', { ids })
+      .getRawMany<ProductListRow>();
+    return new Map(rows.map((row) => [row.id, row]));
   }
 
+  private async sumStocksByProductIds(
+    productIds: string[],
+  ): Promise<Map<string, number>> {
+    if (productIds.length === 0) return new Map();
+    const rows = await this.txHost.tx
+      .createQueryBuilder(Sku, 'sku')
+      .select('sku.productId', 'productId')
+      .addSelect('SUM(sku.stock)', 'totalStock')
+      .where('sku.productId IN (:...productIds)', { productIds })
+      .groupBy('sku.productId')
+      .getRawMany<{ productId: string; totalStock: string }>();
+    return new Map(rows.map((row) => [row.productId, Number(row.totalStock)]));
+  }
+
+  // 보조 정렬 id는 1차 정렬과 같은 방향이어야 인덱스 스캔만으로 정렬된다 (filesort 방지).
   private applySort(qb: SelectQueryBuilder<Product>, sort: ProductSort): void {
     if (sort === 'priceAsc') {
-      qb.orderBy('product.basePrice', 'ASC');
+      qb.orderBy('product.basePrice', 'ASC').addOrderBy('product.id', 'ASC');
     } else if (sort === 'priceDesc') {
-      qb.orderBy('product.basePrice', 'DESC');
+      qb.orderBy('product.basePrice', 'DESC').addOrderBy('product.id', 'DESC');
     } else {
-      qb.orderBy('product.createdAt', 'DESC');
+      qb.orderBy('product.createdAt', 'DESC').addOrderBy('product.id', 'DESC');
     }
-    // 1차 정렬 키가 같은 행들의 순서를 고정해 페이지 간 중복·누락을 막는다.
-    qb.addOrderBy('product.id', 'DESC');
   }
 
   private escapeLikeKeyword(keyword: string): string {
@@ -138,13 +162,16 @@ export class TypeOrmProductRepository extends ProductRepository {
     return keyword.replace(/[\\%_]/g, '\\$&');
   }
 
-  private toListItem(row: ProductListRow): ProductListItem {
+  private toListItem(
+    row: ProductListRow,
+    stockByProductId: Map<string, number>,
+  ): ProductListItem {
     return {
       id: row.id,
       name: row.name,
       basePrice: Number(row.basePrice),
       category: row.category,
-      isSoldOut: Number(row.isSoldOut) === 1,
+      isSoldOut: (stockByProductId.get(row.id) ?? 0) === 0,
     };
   }
 }
