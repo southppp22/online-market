@@ -46,7 +46,12 @@ export class ProductService {
       items.map((item) => item.skuId),
     );
     for (const item of items) {
-      this.getSkuForStockChange(skus, item.skuId).decreaseStock(item.quantity);
+      const sku = skus.find((candidate) => candidate.id === item.skuId);
+      if (!sku) {
+        throw new SkuNotFoundError(item.skuId);
+      }
+      sku.assertAddableToCart();
+      sku.decreaseStock(item.quantity);
     }
     await this.productRepository.saveSkus(skus);
   }
@@ -57,17 +62,12 @@ export class ProductService {
       items.map((item) => item.skuId),
     );
     for (const item of items) {
-      this.getSkuForStockChange(skus, item.skuId).increaseStock(item.quantity);
+      const sku = skus.find((candidate) => candidate.id === item.skuId);
+      if (!sku) {
+        throw new SkuNotFoundError(item.skuId);
+      }
+      sku.increaseStock(item.quantity);
     }
     await this.productRepository.saveSkus(skus);
-  }
-
-  private getSkuForStockChange(skus: Sku[], skuId: string): Sku {
-    const sku = skus.find((candidate) => candidate.id === skuId);
-    if (!sku) {
-      throw new SkuNotFoundError(skuId);
-    }
-    sku.assertAddableToCart();
-    return sku;
   }
 }

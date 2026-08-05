@@ -71,13 +71,15 @@ export class TypeOrmProductRepository extends ProductRepository {
     if (skuIds.length === 0) return [];
     // 정렬 없이 잠그면 트랜잭션 간 교착상태가 발생할 수 있어 id 오름차순으로 정렬 후 잠근다.
     const sortedIds = [...skuIds].sort();
-    return this.txHost.tx
+    const skus = await this.txHost.tx
       .createQueryBuilder(Sku, 'sku')
-      .leftJoinAndSelect('sku.product', 'product')
       .where('sku.id IN (:...sortedIds)', { sortedIds })
       .orderBy('sku.id', 'ASC')
       .setLock('pessimistic_write')
       .getMany();
+    // 락 범위를 skus 행으로 한정하기 위해 product는 조인하지 않고 별도 조회한다.
+    await this.attachProducts(skus);
+    return skus;
   }
 
   async findSkusWithProductByIds(skuIds: string[]): Promise<Sku[]> {
@@ -91,6 +93,23 @@ export class TypeOrmProductRepository extends ProductRepository {
 
   async saveSkus(skus: Sku[]): Promise<void> {
     await this.txHost.tx.save(skus);
+  }
+
+  private async attachProducts(skus: Sku[]): Promise<void> {
+    if (skus.length === 0) return;
+    // 소프트 삭제된 상품도 포함해야 하므로 deletedAt으로 거르지 않는다.
+    const products = await this.txHost.tx.findBy(Product, {
+      id: In(skus.map((sku) => sku.productId)),
+    });
+    const productById = new Map(
+      products.map((product) => [product.id, product]),
+    );
+    for (const sku of skus) {
+      const product = productById.get(sku.productId);
+      if (product) {
+        sku.product = product;
+      }
+    }
   }
 
   private buildFilteredQuery(

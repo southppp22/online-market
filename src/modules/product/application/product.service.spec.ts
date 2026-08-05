@@ -150,6 +150,20 @@ describe('ProductService', () => {
       expect(withTransaction).toHaveBeenCalledTimes(1);
     });
 
+    it('삭제된 상품의 SKU여도 재고를 복원한다', async () => {
+      const sku = createTestSku({
+        id: skuId,
+        stock: 5,
+        product: createTestProduct({ deletedAt: new Date() }),
+      });
+      repository.findSkusByIdsForUpdate.mockResolvedValue([sku]);
+
+      await service.restoreStocks([{ skuId, quantity: 3 }]);
+
+      expect(sku.stock).toBe(8);
+      expect(repository.saveSkus).toHaveBeenCalledWith([sku]);
+    });
+
     it('SKU가 일부 존재하지 않으면 SkuNotFoundError를 던진다', async () => {
       repository.findSkusByIdsForUpdate.mockResolvedValue([]);
 
