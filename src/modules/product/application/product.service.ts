@@ -4,6 +4,7 @@ import { ProductNotFoundError } from '../domain/product.errors';
 import { Product } from '../domain/product.entity';
 import {
   ProductListFilter,
+  ProductListItem,
   ProductListResult,
   ProductRepository,
 } from '../domain/product.repository';
@@ -21,6 +22,10 @@ export class ProductService {
 
   async listProducts(filter: ProductListFilter): Promise<ProductListResult> {
     return this.productRepository.findMany(filter);
+  }
+
+  async listRecommendedProducts(size: number): Promise<ProductListItem[]> {
+    return this.productRepository.findRecommended(size);
   }
 
   async getProductDetail(productId: string): Promise<Product> {

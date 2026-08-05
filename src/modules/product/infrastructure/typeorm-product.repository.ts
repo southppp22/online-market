@@ -44,6 +44,25 @@ export class TypeOrmProductRepository extends ProductRepository {
     return { items, totalCount, hasMore };
   }
 
+  async findRecommended(size: number): Promise<ProductListItem[]> {
+    const rows = await this.txHost.tx
+      .createQueryBuilder(Product, 'product')
+      .select('product.id', 'id')
+      .addSelect('product.name', 'name')
+      .addSelect('product.basePrice', 'basePrice')
+      .addSelect('product.category', 'category')
+      .where('product.deletedAt IS NULL')
+      .andWhere('product.isRecommended = true')
+      .orderBy('product.createdAt', 'DESC')
+      .addOrderBy('product.id', 'DESC')
+      .limit(size)
+      .getRawMany<ProductListRow>();
+    const stockByProductId = await this.sumStocksByProductIds(
+      rows.map((row) => row.id),
+    );
+    return rows.map((row) => this.toListItem(row, stockByProductId));
+  }
+
   async findByIdWithSkus(id: string): Promise<Product | null> {
     return this.txHost.tx.findOne(Product, {
       where: { id, deletedAt: IsNull() },

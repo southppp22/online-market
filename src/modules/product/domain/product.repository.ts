@@ -34,6 +34,7 @@ export interface ProductListResult {
 
 export abstract class ProductRepository {
   abstract findMany(filter: ProductListFilter): Promise<ProductListResult>;
+  abstract findRecommended(size: number): Promise<ProductListItem[]>;
   abstract findByIdWithSkus(id: string): Promise<Product | null>;
   abstract findSkusByIdsForUpdate(skuIds: string[]): Promise<Sku[]>;
   abstract findSkusWithProductByIds(skuIds: string[]): Promise<Sku[]>;

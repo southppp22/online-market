@@ -32,6 +32,7 @@ describe('ProductService', () => {
           provide: ProductRepository,
           useValue: {
             findMany: jest.fn(),
+            findRecommended: jest.fn(),
             findByIdWithSkus: jest.fn(),
             findSkusByIdsForUpdate: jest.fn(),
             findSkusWithProductByIds: jest.fn(),
@@ -56,6 +57,18 @@ describe('ProductService', () => {
 
       expect(repository.findMany).toHaveBeenCalledWith(filter);
       expect(actual).toBe(result);
+    });
+  });
+
+  describe('listRecommendedProducts', () => {
+    it('전달받은 size 그대로 repository에 위임한다', async () => {
+      const items = [];
+      repository.findRecommended.mockResolvedValue(items);
+
+      const actual = await service.listRecommendedProducts(20);
+
+      expect(repository.findRecommended).toHaveBeenCalledWith(20);
+      expect(actual).toBe(items);
     });
   });
 
