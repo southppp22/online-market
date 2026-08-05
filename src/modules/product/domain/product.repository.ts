@@ -9,7 +9,7 @@ export interface ProductListFilter {
   category?: ProductCategory;
   minPrice?: number;
   maxPrice?: number;
-  recommended?: boolean;
+  isSoldOut?: boolean;
   sort: ProductSort;
   page: number;
   size: number;

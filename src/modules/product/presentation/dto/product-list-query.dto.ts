@@ -27,7 +27,7 @@ export class ProductListQueryDto {
 
   @IsOptional()
   @IsIn(['true', 'false'])
-  recommended?: string;
+  isSoldOut?: string;
 
   @IsOptional()
   @IsIn(['latest', 'priceAsc', 'priceDesc'])
@@ -52,7 +52,8 @@ export class ProductListQueryDto {
       category: this.category,
       minPrice: this.minPrice,
       maxPrice: this.maxPrice,
-      recommended: this.recommended === 'true' ? true : undefined,
+      isSoldOut:
+        this.isSoldOut === undefined ? undefined : this.isSoldOut === 'true',
       sort: this.sort,
       page: this.page,
       size: this.size,

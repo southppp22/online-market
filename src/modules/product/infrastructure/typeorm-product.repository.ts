@@ -123,8 +123,10 @@ export class TypeOrmProductRepository extends ProductRepository {
         maxPrice: filter.maxPrice,
       });
     }
-    if (filter.recommended) {
-      qb.andWhere('product.isRecommended = true');
+    if (filter.isSoldOut !== undefined) {
+      const exists =
+        'EXISTS (SELECT 1 FROM skus sku WHERE sku.productId = product.id AND sku.stock > 0)';
+      qb.andWhere(filter.isSoldOut ? `NOT ${exists}` : exists);
     }
     return qb;
   }
