@@ -5,6 +5,7 @@ import { In, IsNull, SelectQueryBuilder } from 'typeorm';
 import { ProductCategory } from '../domain/product-category';
 import { Product } from '../domain/product.entity';
 import {
+  PRODUCT_LIST_COUNT_CAP,
   ProductListFilter,
   ProductListItem,
   ProductListResult,
@@ -29,7 +30,10 @@ export class TypeOrmProductRepository extends ProductRepository {
   }
 
   async findMany(filter: ProductListFilter): Promise<ProductListResult> {
-    const totalCount = await this.buildFilteredQuery(filter).getCount();
+    const { totalCount, hasMore } = await this.countCapped(filter);
+    if ((filter.page - 1) * filter.size >= PRODUCT_LIST_COUNT_CAP) {
+      return { items: [], totalCount, hasMore };
+    }
     const pageIds = await this.findPageIds(filter);
     const rowById = await this.findListRowsByIds(pageIds);
     const stockByProductId = await this.sumStocksByProductIds(pageIds);
@@ -37,7 +41,7 @@ export class TypeOrmProductRepository extends ProductRepository {
       .map((id) => rowById.get(id))
       .filter((row): row is ProductListRow => row !== undefined)
       .map((row) => this.toListItem(row, stockByProductId));
-    return { items, totalCount };
+    return { items, totalCount, hasMore };
   }
 
   async findByIdWithSkus(id: string): Promise<Product | null> {
@@ -104,6 +108,24 @@ export class TypeOrmProductRepository extends ProductRepository {
       qb.andWhere('product.isRecommended = true');
     }
     return qb;
+  }
+
+  private async countCapped(
+    filter: ProductListFilter,
+  ): Promise<{ totalCount: number; hasMore: boolean }> {
+    const inner = this.buildFilteredQuery(filter)
+      .select('product.id')
+      .limit(PRODUCT_LIST_COUNT_CAP + 1);
+    const [sql, params] = inner.getQueryAndParameters();
+    const rows: { cnt: string }[] = await this.txHost.tx.query(
+      `SELECT COUNT(1) AS cnt FROM (${sql}) t`,
+      params,
+    );
+    const count = Number(rows[0].cnt);
+    return {
+      totalCount: Math.min(count, PRODUCT_LIST_COUNT_CAP),
+      hasMore: count > PRODUCT_LIST_COUNT_CAP,
+    };
   }
 
   // id만 골라야 오프셋 스킵이 정렬 인덱스만 읽는다 (행 조회는 확정된 size건만).

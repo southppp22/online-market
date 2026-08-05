@@ -49,7 +49,7 @@ describe('ProductService', () => {
   describe('listProducts', () => {
     it('전달받은 필터 그대로 repository에 위임한다', async () => {
       const filter: ProductListFilter = { sort: 'latest', page: 1, size: 20 };
-      const result = { items: [], totalCount: 0 };
+      const result = { items: [], totalCount: 0, hasMore: false };
       repository.findMany.mockResolvedValue(result);
 
       const actual = await service.listProducts(filter);

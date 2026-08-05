@@ -23,9 +23,13 @@ export interface ProductListItem {
   isSoldOut: boolean;
 }
 
+// totalCount는 이 값에서 잘리고, 초과분은 hasMore로만 알린다.
+export const PRODUCT_LIST_COUNT_CAP = 10_000;
+
 export interface ProductListResult {
   items: ProductListItem[];
   totalCount: number;
+  hasMore: boolean;
 }
 
 export abstract class ProductRepository {
