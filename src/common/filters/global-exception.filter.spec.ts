@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { QueryFailedError } from 'typeorm';
 import { ConflictDomainError } from '../errors/conflict.domain-error';
 import { DomainError } from '../errors/domain-error';
 import { NotFoundDomainError } from '../errors/not-found.domain-error';
@@ -53,14 +54,16 @@ class StubUnclassifiedError extends DomainError {
 
 describe('GlobalExceptionFilter', () => {
   const filter = new GlobalExceptionFilter();
-  let response: { status: jest.Mock; json: jest.Mock };
+  let response: { status: jest.Mock; json: jest.Mock; setHeader: jest.Mock };
   let host: ArgumentsHost;
 
   beforeEach(() => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     response = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
+      setHeader: jest.fn(),
     };
     host = {
       switchToHttp: () => ({ getResponse: () => response }),
@@ -148,5 +151,54 @@ describe('GlobalExceptionFilter', () => {
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Internal server error',
     });
+    expect(response.setHeader).not.toHaveBeenCalled();
+  });
+
+  it("mysql2의 'Queue limit reached.'는 503으로 응답한다", () => {
+    filter.catch(new Error('Queue limit reached.'), host);
+
+    expect(response.status).toHaveBeenCalledWith(503);
+    expect(response.setHeader).toHaveBeenCalledWith('Retry-After', '1');
+    expect(response.json).toHaveBeenCalledWith({
+      code: 'SERVICE_UNAVAILABLE',
+      message: '요청이 많아 처리하지 못했습니다',
+    });
+  });
+
+  it('MySQL errno 3024(쿼리 실행시간 초과)는 503으로 응답한다', () => {
+    const driverError = Object.assign(
+      new Error(
+        'Query execution was interrupted, maximum statement execution time exceeded',
+      ),
+      { code: 'ER_QUERY_TIMEOUT', errno: 3024, sqlState: 'HY000' },
+    );
+
+    filter.catch(
+      new QueryFailedError('SELECT 1', [], driverError as never),
+      host,
+    );
+
+    expect(response.status).toHaveBeenCalledWith(503);
+    expect(response.setHeader).toHaveBeenCalledWith('Retry-After', '1');
+    expect(response.json).toHaveBeenCalledWith({
+      code: 'SERVICE_UNAVAILABLE',
+      message: '요청이 많아 처리하지 못했습니다',
+    });
+  });
+
+  it('과부하가 아닌 QueryFailedError는 500으로 남는다', () => {
+    const driverError = Object.assign(new Error("Unknown column 'x'"), {
+      code: 'ER_BAD_FIELD_ERROR',
+      errno: 1054,
+      sqlState: '42S22',
+    });
+
+    filter.catch(
+      new QueryFailedError('SELECT x', [], driverError as never),
+      host,
+    );
+
+    expect(response.status).toHaveBeenCalledWith(500);
+    expect(response.setHeader).not.toHaveBeenCalled();
   });
 });

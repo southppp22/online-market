@@ -9,6 +9,7 @@ import {
 import { Response } from 'express';
 import { DomainError } from '../errors/domain-error';
 import { httpStatusOfDomainError } from './domain-error-http-status';
+import { isOverloadError } from './overload-error';
 
 interface ErrorBody {
   code: string;
@@ -22,16 +23,28 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
     const { status, body } = this.toErrorResponse(exception);
-    if (status >= 500) {
+    if (status === HttpStatus.SERVICE_UNAVAILABLE) {
+      this.logger.warn(exception);
+      response.setHeader('Retry-After', '1');
+    } else if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error(exception);
     }
     response.status(status).json(body);
   }
 
   private toErrorResponse(exception: unknown): {
-    status: number;
+    status: HttpStatus;
     body: ErrorBody;
   } {
+    if (isOverloadError(exception)) {
+      return {
+        status: HttpStatus.SERVICE_UNAVAILABLE,
+        body: {
+          code: 'SERVICE_UNAVAILABLE',
+          message: '요청이 많아 처리하지 못했습니다',
+        },
+      };
+    }
     if (exception instanceof DomainError) {
       return {
         status: httpStatusOfDomainError(exception),

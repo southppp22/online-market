@@ -58,6 +58,10 @@ class EnvironmentVariables {
   PORT?: number;
 
   @IsOptional()
+  @IsInt()
+  REQUEST_TIMEOUT_MS?: number;
+
+  @IsOptional()
   @IsString()
   NODE_ENV?: string;
 }
