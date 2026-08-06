@@ -185,6 +185,7 @@ export class TypeOrmProductRepository extends ProductRepository {
       .addSelect('product.basePrice', 'basePrice')
       .addSelect('product.category', 'category')
       .where('product.id IN (:...ids)', { ids })
+      .andWhere('product.deletedAt IS NULL')
       .getRawMany<ProductListRow>();
     return new Map(rows.map((row) => [row.id, row]));
   }
