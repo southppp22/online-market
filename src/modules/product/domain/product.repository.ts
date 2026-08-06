@@ -23,17 +23,8 @@ export interface ProductListItem {
   isSoldOut: boolean;
 }
 
-// 서비스하는 조회 창의 크기 — totalCount는 여기서 잘리고(초과분은 hasMore), 오프셋도 여기까지만 허용한다.
-export const PRODUCT_LIST_MAX_RESULTS = 10_000;
-
-export interface ProductListResult {
-  items: ProductListItem[];
-  totalCount: number;
-  hasMore: boolean;
-}
-
 export abstract class ProductRepository {
-  abstract findMany(filter: ProductListFilter): Promise<ProductListResult>;
+  abstract findMany(filter: ProductListFilter): Promise<ProductListItem[]>;
   abstract findRecommended(size: number): Promise<ProductListItem[]>;
   abstract findByIdWithSkus(id: string): Promise<Product | null>;
   abstract findSkusByIdsForUpdate(skuIds: string[]): Promise<Sku[]>;

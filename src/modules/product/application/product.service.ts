@@ -5,7 +5,6 @@ import { Product } from '../domain/product.entity';
 import {
   ProductListFilter,
   ProductListItem,
-  ProductListResult,
   ProductRepository,
 } from '../domain/product.repository';
 import { Sku } from '../domain/sku.entity';
@@ -20,7 +19,7 @@ interface StockChangeItem {
 export class ProductService {
   constructor(private readonly productRepository: ProductRepository) {}
 
-  async listProducts(filter: ProductListFilter): Promise<ProductListResult> {
+  async listProducts(filter: ProductListFilter): Promise<ProductListItem[]> {
     return this.productRepository.findMany(filter);
   }
 

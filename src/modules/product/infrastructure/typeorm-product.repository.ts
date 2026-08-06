@@ -5,10 +5,8 @@ import { In, IsNull, SelectQueryBuilder } from 'typeorm';
 import { ProductCategory } from '../domain/product-category';
 import { Product } from '../domain/product.entity';
 import {
-  PRODUCT_LIST_MAX_RESULTS,
   ProductListFilter,
   ProductListItem,
-  ProductListResult,
   ProductRepository,
   ProductSort,
 } from '../domain/product.repository';
@@ -29,16 +27,14 @@ export class TypeOrmProductRepository extends ProductRepository {
     super();
   }
 
-  async findMany(filter: ProductListFilter): Promise<ProductListResult> {
-    const { totalCount, hasMore } = await this.countUpToMax(filter);
+  async findMany(filter: ProductListFilter): Promise<ProductListItem[]> {
     const pageIds = await this.findPageIds(filter);
     const rowById = await this.findListRowsByIds(pageIds);
     const stockByProductId = await this.sumStocksByProductIds(pageIds);
-    const items = pageIds
+    return pageIds
       .map((id) => rowById.get(id))
       .filter((row): row is ProductListRow => row !== undefined)
       .map((row) => this.toListItem(row, stockByProductId));
-    return { items, totalCount, hasMore };
   }
 
   async findRecommended(size: number): Promise<ProductListItem[]> {
@@ -143,24 +139,6 @@ export class TypeOrmProductRepository extends ProductRepository {
       qb.andWhere(filter.isSoldOut ? `NOT ${exists}` : exists);
     }
     return qb;
-  }
-
-  private async countUpToMax(
-    filter: ProductListFilter,
-  ): Promise<{ totalCount: number; hasMore: boolean }> {
-    const inner = this.buildFilteredQuery(filter)
-      .select('product.id')
-      .limit(PRODUCT_LIST_MAX_RESULTS + 1);
-    const [sql, params] = inner.getQueryAndParameters();
-    const rows: { cnt: string }[] = await this.txHost.tx.query(
-      `SELECT COUNT(1) AS cnt FROM (${sql}) t`,
-      params,
-    );
-    const count = Number(rows[0].cnt);
-    return {
-      totalCount: Math.min(count, PRODUCT_LIST_MAX_RESULTS),
-      hasMore: count > PRODUCT_LIST_MAX_RESULTS,
-    };
   }
 
   // id만 골라야 오프셋 스킵이 정렬 인덱스만 읽는다 (행 조회는 확정된 size건만).

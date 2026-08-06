@@ -16,8 +16,8 @@ export class ProductController {
   async list(
     @Query() query: ProductListQueryDto,
   ): Promise<ProductListResponseDto> {
-    const result = await this.productService.listProducts(query.toFilter());
-    return ProductListResponseDto.from(result, query);
+    const items = await this.productService.listProducts(query.toFilter());
+    return ProductListResponseDto.from(items, query);
   }
 
   // ':productId' 라우트보다 먼저 선언해야 'recommended'가 UUID 파라미터로 매칭되지 않는다.

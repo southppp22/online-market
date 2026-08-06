@@ -2,7 +2,6 @@ import { ProductCategory } from '../../domain/product-category';
 import {
   ProductListFilter,
   ProductListItem,
-  ProductListResult,
 } from '../../domain/product.repository';
 
 export class ProductListItemResponseDto {
@@ -29,26 +28,20 @@ export class ProductListResponseDto {
   items: ProductListItemResponseDto[];
   page: number;
   size: number;
-  totalCount: number;
-  hasMore: boolean;
 
   private constructor(
-    result: ProductListResult,
+    items: ProductListItem[],
     filter: Pick<ProductListFilter, 'page' | 'size'>,
   ) {
-    this.items = result.items.map((item) =>
-      ProductListItemResponseDto.from(item),
-    );
+    this.items = items.map((item) => ProductListItemResponseDto.from(item));
     this.page = filter.page;
     this.size = filter.size;
-    this.totalCount = result.totalCount;
-    this.hasMore = result.hasMore;
   }
 
   static from(
-    result: ProductListResult,
+    items: ProductListItem[],
     filter: Pick<ProductListFilter, 'page' | 'size'>,
   ): ProductListResponseDto {
-    return new ProductListResponseDto(result, filter);
+    return new ProductListResponseDto(items, filter);
   }
 }
